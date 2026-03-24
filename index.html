@@ -101,7 +101,7 @@ tbody tr:hover td{background:rgba(100,80,255,.04)}
 .renew-screen{display:none;position:fixed;inset:0;background:rgba(4,4,10,.97);z-index:9998;flex-direction:column;align-items:center;justify-content:center;gap:20px}
 .renew-screen.show{display:flex}
 .renew-card{background:var(--card);border:1px solid var(--rim2);border-radius:16px;padding:40px;max-width:460px;width:90%;text-align:center;box-shadow:0 0 60px rgba(100,80,255,.1)}
-.renew-hex{width:52px;height:52px;background:var(--neon3);border:1px solid var(--neon);clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:13px;color:var(--neon2);box-shadow:0 0 20px rgba(100,80,255,.3);margin:0 auto 18px;animation:spin 8s linear infinite}
+.renew-hex{width:52px;height:52px;background:var(--neon3);border:1px solid var(--neon);clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:13px;color:var(--neon2);margin:0 auto 18px;animation:spin 8s linear infinite}
 .renew-title{font-size:20px;font-weight:700;margin-bottom:8px}
 .renew-sub{font-size:13px;color:var(--text2);line-height:1.6;margin-bottom:22px}
 .renew-steps{background:rgba(13,13,26,.8);border:1px solid var(--rim);border-radius:10px;padding:16px;margin-bottom:20px;font-size:11px;color:var(--text2);line-height:2;text-align:left}
@@ -115,24 +115,22 @@ tbody tr:hover td{background:rgba(100,80,255,.04)}
 </head>
 <body>
 <div class="ldr gone" id="ldr"><div class="hspin"></div><div class="lt">CARREGANDO DADOS...</div><div class="lsub2" id="lsub">Aguarde</div></div>
-
 <div class="renew-screen" id="renew">
   <div class="renew-card">
     <div class="renew-hex">RT</div>
-    <div class="renew-title">Sessão Expirada</div>
-    <div class="renew-sub">O token de acesso expirou. Cole o novo token abaixo para reconectar.</div>
+    <div class="renew-title">Renovar Sessão</div>
+    <div class="renew-sub">O token expirou (validade ~24h). Cole o novo token abaixo.</div>
     <div class="renew-steps">
-      <strong style="color:var(--text)">Como obter o token:</strong><br>
+      <strong style="color:var(--text)">Como obter:</strong><br>
       1. Abra <code>app.redtrack.io</code> no Chrome<br>
       2. Pressione <code>F12</code> → Console<br>
-      3. Cole: <code>JSON.parse(localStorage.getItem('redtrack_hst')).authorization</code><br>
-      4. Copie o resultado e cole abaixo
+      3. Execute: <code>JSON.parse(localStorage.getItem('redtrack_hst')).authorization</code><br>
+      4. Copie e cole abaixo
     </div>
-    <input class="renew-input" id="renew-input" placeholder="Bearer eyJhbGci..." />
-    <button class="renew-btn" onclick="applyToken()">⬡ Reconectar</button>
+    <input class="renew-input" id="ri" placeholder="Bearer eyJhbGci..." />
+    <button class="renew-btn" onclick="applyTok()">⬡ Conectar</button>
   </div>
 </div>
-
 <div class="hdr">
   <div class="hex">RT</div>
   <div><div class="brand">RedTrack Dashboard</div><div class="brand-sub">GT: Felipe · felipepisol@groupwave.global</div></div>
@@ -143,7 +141,7 @@ tbody tr:hover td{background:rgba(100,80,255,.04)}
     <button class="pt" onclick="sp('lifetime',this)">All</button>
   </div>
   <div class="hdr-r">
-    <div class="live"><div class="dot" id="dot"></div><span id="slbl" style="font-size:10px;letter-spacing:.04em">SYNC</span></div>
+    <div class="live"><div class="dot" id="dot"></div><span id="slbl" style="font-size:10px;letter-spacing:.04em">—</span></div>
     <div class="lupd" id="lupd"></div>
     <button class="sync-btn" onclick="go()">⟳ SYNC</button>
   </div>
@@ -173,51 +171,31 @@ tbody tr:hover td{background:rgba(100,80,255,.04)}
 </div>
 <script>
 const BASE='https://app.redtrack.io/api',TZ='America/Sao_Paulo',ME='Felipe';
+const BAKED='Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0eXAiOjEsImlhdCI6MTc3NDI5MjE2MSwiZXhwIjoxNzc0Mzc4NTYxLCJ1c2VyX2lkIjoiNjZlMWE3NzljNTIyYzY0YWRlNGMzMmJkIiwic2lkIjoiNjljMThjYzExNTg4N2FhYzhiYzg0MmMzIiwidGlkIjoiNjljMThjYzExNTg4N2FhYzhiYzg0MmM0In0.hKG21dFXblBCdrB-_HKBnBY6aAVzHSNQ6oIhWpZXWWM';
 let per='today',_c={},_tok='';
 const pad=n=>String(n).padStart(2,'0');
 const fd=d=>d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
 const td=()=>fd(new Date());
 const ago=n=>{const d=new Date();d.setDate(d.getDate()-n);return fd(d)};
 const dts=p=>({today:{f:td(),t:td()},d3:{f:ago(2),t:td()},d7:{f:ago(6),t:td()},lifetime:{f:'2024-01-01',t:td()}}[p]||{f:td(),t:td()});
-function getSavedTok(){
-  try{const t=localStorage.getItem('rt_dash_tok');if(t)return t;}catch(e){}
-  const h=location.hash.slice(1);const p=new URLSearchParams(h);const t=p.get('t');if(t)return t.startsWith('B')?t:'Bearer '+t;
-  const u=new URLSearchParams(location.search);const q=u.get('t');if(q)return q.startsWith('B')?q:'Bearer '+q;
-  return null;
-}
-function saveTok(t){try{localStorage.setItem('rt_dash_tok',t);}catch(e){}}
-function applyToken(){
-  const v=document.getElementById('renew-input').value.trim();
-  if(!v)return;
-  _tok=v.startsWith('B')?v:'Bearer '+v;
-  saveTok(_tok);
-  document.getElementById('renew').classList.remove('show');
-  go();
-}
+function getSaved(){try{return localStorage.getItem('rt_dash_tok');}catch(e){return null;}}
+function save(t){try{localStorage.setItem('rt_dash_tok',t);}catch(e){}}
+function applyTok(){const v=document.getElementById('ri').value.trim();if(!v)return;_tok=v.startsWith('B')?v:'Bearer '+v;save(_tok);document.getElementById('renew').classList.remove('show');go();}
 async function api(path){
   const r=await fetch(BASE+path,{headers:{'Authorization':_tok,'Content-Type':'application/json'}});
-  if(r.status===401){document.getElementById('renew').classList.add('show');document.getElementById('ldr').classList.add('gone');throw new Error('TOKEN_EXPIRED');}
+  if(r.status===401){save('');document.getElementById('renew').classList.add('show');EL('ldr').classList.add('gone');throw new Error('EXPIRED');}
   if(!r.ok)throw new Error('HTTP '+r.status);
   return r.json();
 }
-async function gc(f,t){
-  const k='c'+f+t;if(_c[k])return _c[k];
-  let a=[],pg=1;
-  while(1){const d=await api('/campaigns?date_from='+f+'&date_to='+t+'&status=&with_clicks=true&page='+pg+'&per=200&sortby=clicks&direction=desc&timezone='+encodeURIComponent(TZ)+'&total=true');const it=d.items||[];a=a.concat(it);if(it.length<200)break;pg++;}
-  return _c[k]=a;
-}
-async function gr(f,t,g){
-  const k='r'+f+t+g;if(_c[k])return _c[k];
-  const d=await api('/report?date_from='+f+'&date_to='+t+'&timezone='+encodeURIComponent(TZ)+'&group[]='+g+'&per=500');
-  return _c[k]=(Array.isArray(d)?d:[]);
-}
+async function gc(f,t){const k='c'+f+t;if(_c[k])return _c[k];let a=[],pg=1;while(1){const d=await api('/campaigns?date_from='+f+'&date_to='+t+'&status=&with_clicks=true&page='+pg+'&per=200&sortby=clicks&direction=desc&timezone='+encodeURIComponent(TZ)+'&total=true');const it=d.items||[];a=a.concat(it);if(it.length<200)break;pg++;}return _c[k]=a;}
+async function gr(f,t,g){const k='r'+f+t+g;if(_c[k])return _c[k];const d=await api('/report?date_from='+f+'&date_to='+t+'&timezone='+encodeURIComponent(TZ)+'&group[]='+g+'&per=500');return _c[k]=(Array.isArray(d)?d:[]);}
 const EL=id=>document.getElementById(id);
 const f$=n=>'$'+Math.abs(n).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
 const fR=r=>(r>=0?'+':'')+r.toFixed(1)+'%';
 const rc=r=>r>0?'cg':r<-5?'cr':'ca';
 const gtOf=t=>{const m=(t||'').match(/GT:\s*(\w+)/);return m?m[1]:'?'};
-function rBar(roi){const p=Math.min(Math.abs(roi),100),col=roi>0?'var(--green)':roi<-10?'var(--red)':'var(--amber)';return '<div class="rw"><span class="'+rc(roi)+' mn">'+fR(roi)+'</span><div class="rtrack"><div class="rfill" style="width:'+p+'%;background:'+col+'"></div></div></div>'}
-function sBdg(roi){if(roi>20)return'<span class="bdg bg">✦ Lucro</span>';if(roi>=-5)return'<span class="bdg ba">◈ Neutro</span>';return'<span class="bdg br">✕ Prejuízo</span>'}
+function rBar(roi){const p=Math.min(Math.abs(roi),100),col=roi>0?'var(--green)':roi<-10?'var(--red)':'var(--amber)';return '<div class="rw"><span class="'+rc(roi)+' mn">'+fR(roi)+'</span><div class="rtrack"><div class="rfill" style="width:'+p+'%;background:'+col+'"></div></div></div>';}
+function sBdg(roi){if(roi>20)return'<span class="bdg bg">✦ Lucro</span>';if(roi>=-5)return'<span class="bdg ba">◈ Neutro</span>';return'<span class="bdg br">✕ Prejuízo</span>';}
 async function render(){
   const{f,t}=dts(per);EL('lsub').textContent='Buscando dados...';
   const[my,tod,d7i,h7,d7c]=await Promise.all([gc(f,t),gc(td(),td()),gr(ago(6),td(),'date'),gr(ago(6),td(),'hour'),gc(ago(6),td())]);
@@ -227,34 +205,30 @@ async function render(){
   const roi=tot.cost>0?(tot.profit/tot.cost)*100:0,cpa=tot.ct7>0?tot.cost/tot.ct7:0,cpc=tot.clicks>0?tot.cost/tot.clicks:0;
   EL('kpis').innerHTML='<div class="kpi hi"><div class="kl">Cliques</div><div class="kv mn">'+tot.clicks.toLocaleString('pt-BR')+'</div><div class="ks">'+fil.length+' camp. · CPC '+f$(cpc)+'</div></div><div class="kpi"><div class="kl">Custo Total</div><div class="kv mn">'+f$(tot.cost)+'</div><div class="ks">No período</div></div><div class="kpi"><div class="kl">Lucro / Prejuízo</div><div class="kv mn '+rc(tot.profit)+'">'+(tot.profit>=0?'+':'−')+f$(tot.profit)+'</div><div class="ks '+rc(roi)+'">ROI '+fR(roi)+'</div></div><div class="kpi"><div class="kl">Vendas CT7</div><div class="kv mn '+(tot.ct7>0?'cg':'')+'">'+tot.ct7+'</div><div class="ks">CPA '+(cpa>0?f$(cpa):'N/A')+'</div></div><div class="kpi"><div class="kl">Leads CT1</div><div class="kv mn">'+tot.ct1+'</div><div class="ks">Conv '+(tot.ct1>0?((tot.ct7/tot.ct1)*100).toFixed(0)+'%':'N/A')+'</div></div><div class="kpi hi"><div class="kl">CPA Real</div><div class="kv mn '+(cpa>0&&cpa<40?'cg':cpa>60?'cr':'ca')+'">'+(cpa>0?f$(cpa):'—')+'</div><div class="ks">Meta ≤ $40</div></div>';
   EL('cbdg').textContent=fil.length+' campanhas';
-  EL('ct').innerHTML=fil.length?fil.map(c=>{const cR=c.cost>0?((c.profit||0)/c.cost)*100:0,cC=(c.convtype7||0)>0?c.cost/c.convtype7:0,pts=(c.title||'').split('|');return'<tr><td><div class="tm">'+(pts[1]||c.title).trim()+'</div><div class="ts">'+(pts[pts.length-1]||'').trim()+'</div></td><td class="mn">'+((c.clicks||0).toLocaleString('pt-BR'))+'</td><td class="mn">'+f$(c.cost||0)+'</td><td class="mn '+(c.convtype7>0?'cg':'')+'">'+c.convtype7+'</td><td class="mn">'+c.convtype1+'</td><td class="mn">'+(cC>0?f$(cC):'—')+'</td><td class="mn">'+(c.cpc?f$(c.cpc):'—')+'</td><td>'+rBar(cR)+'</td><td>'+sBdg(cR)+'</td></tr>'}).join(''):'<tr><td colspan="9" style="text-align:center;color:var(--text3);padding:20px;font-family:var(--mono);font-size:10px">SEM DADOS NO PERÍODO</td></tr>';
+  EL('ct').innerHTML=fil.length?fil.map(c=>{const cR=c.cost>0?((c.profit||0)/c.cost)*100:0,cC=(c.convtype7||0)>0?c.cost/c.convtype7:0,pts=(c.title||'').split('|');return'<tr><td><div class="tm">'+(pts[1]||c.title).trim()+'</div><div class="ts">'+(pts[pts.length-1]||'').trim()+'</div></td><td class="mn">'+((c.clicks||0).toLocaleString('pt-BR'))+'</td><td class="mn">'+f$(c.cost||0)+'</td><td class="mn '+(c.convtype7>0?'cg':'')+'">'+c.convtype7+'</td><td class="mn">'+c.convtype1+'</td><td class="mn">'+(cC>0?f$(cC):'—')+'</td><td class="mn">'+(c.cpc?f$(c.cpc):'—')+'</td><td>'+rBar(cR)+'</td><td>'+sBdg(cR)+'</td></tr>';}).join(''):'<tr><td colspan="9" style="text-align:center;color:var(--text3);padding:20px;font-family:var(--mono);font-size:10px">SEM DADOS</td></tr>';
   const gm={};
   for(const c of tod){const g=gtOf(c.title);if(g==='?')continue;if(!gm[g])gm[g]={cost:0,profit:0,ct7:0};gm[g].cost+=c.cost||0;gm[g].profit+=c.profit||0;gm[g].ct7+=c.convtype7||0;}
   const sr=Object.entries(gm).map(([n,d])=>({name:n,roi:d.cost>0?(d.profit/d.cost)*100:0,cpa:d.ct7>0?d.cost/d.ct7:0,ct7:d.ct7})).sort((a,b)=>b.roi-a.roi);
   const mx=Math.max(...sr.map(g=>Math.max(g.roi,0)),1);
   EL('bench').innerHTML=sr.map((g,i)=>'<div class="brow"><div class="bn">'+(i+1)+'</div><div class="bname">'+g.name+(g.name===ME?'<span class="metag">eu</span>':'')+'</div><div class="bbg"><div class="bfill" style="width:'+(Math.max(g.roi,0)/mx*100).toFixed(1)+'%;background:'+(g.roi>0?'var(--green)':'var(--red)')+'"></div></div><div class="broi '+rc(g.roi)+'">'+fR(g.roi)+'</div><div class="bcpa">'+(g.cpa>0?f$(g.cpa):'—')+'</div><div class="bv">'+g.ct7+'v</div></div>').join('');
-  EL('dt').innerHTML=d7i.map(d=>{const dR=d.cost>0?((d.profit||0)/d.cost)*100:0,dC=(d.convtype7||0)>0?d.cost/d.convtype7:0,dt2=(d.date||'').substring(5).split('-').reverse().join('/');return'<tr><td class="mn tm">'+dt2+'</td><td class="mn">'+((d.clicks||0).toLocaleString('pt-BR'))+'</td><td class="mn">'+f$(d.cost||0)+'</td><td class="mn '+(d.convtype7>0?'cg':'')+'">'+d.convtype7+'</td><td class="mn">'+(dC>0?f$(dC):'—')+'</td><td class="mn '+(d.profit>=0?'cg':'cr')+'">'+(d.profit>=0?'+':'−')+f$(d.profit||0)+'</td><td class="'+rc(dR)+' mn">'+fR(dR)+'</td></tr>'}).join('');
+  EL('dt').innerHTML=d7i.map(d=>{const dR=d.cost>0?((d.profit||0)/d.cost)*100:0,dC=(d.convtype7||0)>0?d.cost/d.convtype7:0,dt2=(d.date||'').substring(5).split('-').reverse().join('/');return'<tr><td class="mn tm">'+dt2+'</td><td class="mn">'+((d.clicks||0).toLocaleString('pt-BR'))+'</td><td class="mn">'+f$(d.cost||0)+'</td><td class="mn '+(d.convtype7>0?'cg':'')+'">'+d.convtype7+'</td><td class="mn">'+(dC>0?f$(dC):'—')+'</td><td class="mn '+(d.profit>=0?'cg':'cr')+'">'+(d.profit>=0?'+':'−')+f$(d.profit||0)+'</td><td class="'+rc(dR)+' mn">'+fR(dR)+'</td></tr>';}).join('');
   const hm={};for(const h of h7){if(h.hour!==undefined)hm[h.hour]=h.convtype7||0;}
   const ha=Array.from({length:24},(_,i)=>({hour:i,ct7:hm[i]||0}));
   const mh=Math.max(...ha.map(h=>h.ct7),1),pk=ha.reduce((a,b)=>b.ct7>a.ct7?b:a);
   EL('pkchip').textContent='Pico '+pk.hour+'h · '+pk.ct7+'v';
-  EL('hbars').innerHTML=ha.map(h=>{const p=(h.ct7/mh*100).toFixed(1),ip=h.ct7>=mh*.82,col=ip?'var(--green)':'var(--neon)';return'<div class="hb" style="height:'+Math.max(+p,4)+'%;background:'+col+';opacity:'+(ip?'.9':'.3')+';'+(ip?'box-shadow:0 0 6px var(--green)':'')+'" title="'+h.hour+'h: '+h.ct7+'v"></div>'}).join('');
+  EL('hbars').innerHTML=ha.map(h=>{const p=(h.ct7/mh*100).toFixed(1),ip=h.ct7>=mh*.82,col=ip?'var(--green)':'var(--neon)';return'<div class="hb" style="height:'+Math.max(+p,4)+'%;background:'+col+';opacity:'+(ip?'.9':'.3')+';'+(ip?'box-shadow:0 0 6px var(--green)':'')+'" title="'+h.hour+'h: '+h.ct7+'v"></div>';}).join('');
   const os=oth.map(c=>({gt:gtOf(c.title),name:(c.title||'').split('|')[1]?.trim()||c.title,ct7:c.convtype7||0,cost:c.cost||0,cpa:(c.convtype7||0)>0?c.cost/c.convtype7:0,roi:c.cost>0?((c.profit||0)/c.cost)*100:0})).filter(c=>c.ct7>1).sort((a,b)=>b.roi-a.roi).slice(0,6);
   EL('ot').innerHTML=os.map(o=>'<tr><td><span class="gt gt-'+o.gt+'">'+o.gt+'</span></td><td class="tm mn" style="font-size:10px;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+o.name+'</td><td class="mn cg">'+o.ct7+'</td><td class="mn">'+(o.cpa>0?f$(o.cpa):'—')+'</td><td class="'+rc(o.roi)+' mn">'+fR(o.roi)+'</td></tr>').join('')||'<tr><td colspan="5" style="text-align:center;color:var(--text3);padding:12px;font-family:var(--mono);font-size:9px">SEM DADOS</td></tr>';
-  const recs=mkRecs(fil,os,sr,tot,roi,cpa);
-  EL('rchip').textContent=recs.length+' alertas';
-  EL('recs').innerHTML=recs.map(r=>'<div class="rec"><div class="ri ri-'+r.t+'">'+r.i+'</div><div><div class="rt2">'+r.title+'</div><div class="rb">'+r.body+'</div></div></div>').join('');
-}
-function mkRecs(camps,others,ranking,tot,roi,cpa){
   const R=[];
-  const myRk=ranking.findIndex(g=>g.name===ME),top=ranking[0];
-  for(const c of camps){const sn=(c.title||'').split('|')[1]?.trim()||'Campanha';if((c.cost||0)>100&&!(c.convtype7||0)&&(c.clicks||0)>100)R.push({t:'d',i:'⛔',title:'PAUSAR — '+sn,body:f$(c.cost||0)+' gastos, '+((c.clicks||0).toLocaleString('pt-BR'))+' cliques, 0 vendas. Pause no Meta agora.'});}
-  const best=camps.filter(c=>(c.convtype7||0)>0&&(c.cost||0)>0).map(c=>({...c,_r:((c.profit||0)/c.cost)*100,_cpa:c.cost/c.convtype7})).sort((a,b)=>b._r-a._r)[0];
+  const myRk=sr.findIndex(g=>g.name===ME),top=sr[0];
+  for(const c of fil){const sn=(c.title||'').split('|')[1]?.trim()||'Campanha';if((c.cost||0)>100&&!(c.convtype7||0)&&(c.clicks||0)>100)R.push({t:'d',i:'⛔',title:'PAUSAR — '+sn,body:f$(c.cost||0)+' gastos, '+((c.clicks||0).toLocaleString('pt-BR'))+' cliques, 0 vendas. Pause no Meta agora.'});}
+  const best=fil.filter(c=>(c.convtype7||0)>0&&(c.cost||0)>0).map(c=>({...c,_r:((c.profit||0)/c.cost)*100,_cpa:c.cost/c.convtype7})).sort((a,b)=>b._r-a._r)[0];
   if(best&&best._r>20){const sn=(best.title||'').split('|')[1]?.trim()||'Campanha';R.push({t:'s',i:'📈',title:'ESCALAR — '+sn+': ROI '+fR(best._r),body:'CPA '+f$(best._cpa)+' · '+best.convtype7+' vendas. Aumente 30–50% no Meta.'});}
-  if(myRk>0&&top){const myR=ranking.find(g=>g.name===ME)?.roi||roi,gap=top.roi-myR;if(gap>10)R.push({t:'w',i:'📊',title:myRk+1+'º no ranking — '+gap.toFixed(0)+'pts atrás de '+top.name,body:top.name+': ROI '+fR(top.roi)+', CPA '+f$(top.cpa)+'.'});}
+  if(myRk>0&&top){const myR=sr.find(g=>g.name===ME)?.roi||roi,gap=top.roi-myR;if(gap>10)R.push({t:'w',i:'📊',title:myRk+1+'º no ranking — '+gap.toFixed(0)+'pts atrás de '+top.name,body:top.name+': ROI '+fR(top.roi)+', CPA '+f$(top.cpa)+'.'});}
   R.push({t:'i',i:'🕐',title:'Melhor janela: 10h–16h (Brasília)',body:'Configure ad scheduling no Meta para concentrar budget neste intervalo.'});
   if(tot.ct7>0)R.push({t:'w',i:'🔍',title:'Revenue $0 — ROAS incalculável',body:'Postback de purchase value não disparando. Verificar com time técnico.'});
-  return R;
+  EL('rchip').textContent=R.length+' alertas';
+  EL('recs').innerHTML=R.map(r=>'<div class="rec"><div class="ri ri-'+r.t+'">'+r.i+'</div><div><div class="rt2">'+r.title+'</div><div class="rb">'+r.body+'</div></div></div>').join('');
 }
 function setStatus(ok){const d=EL('dot'),l=EL('slbl');d.className='dot'+(ok?' ok':' err');l.textContent=ok?'CONECTADO':'ERRO';l.style.color=ok?'var(--green)':'var(--red)';if(ok){const n=new Date();EL('lupd').textContent=n.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});}}
 function setLoader(v){EL('ldr').classList.toggle('gone',!v);}
@@ -264,13 +238,14 @@ async function go(){
   EL('slbl').textContent='SYNC...';EL('slbl').style.color='var(--amber)';
   setLoader(true);
   try{await render();setStatus(true);}
-  catch(e){setStatus(false);if(e.message!=='TOKEN_EXPIRED'){EL('err').style.display='block';EL('err').textContent='⚠ '+e.message;}}
+  catch(e){setStatus(false);if(e.message!=='EXPIRED'){EL('err').style.display='block';EL('err').textContent='⚠ '+e.message;}}
   setLoader(false);
 }
 function sp(p,el){per=p;document.querySelectorAll('.pt').forEach(b=>b.classList.remove('on'));el.classList.add('on');go();}
 (function(){
-  _tok=getSavedTok();
-  if(_tok){saveTok(_tok);go();}
+  const saved=getSaved();
+  _tok=saved||BAKED;
+  if(_tok){save(_tok);go();}
   else{EL('renew').classList.add('show');}
   setInterval(function(){if(document.visibilityState==='visible'&&_tok)go();},5*60*1000);
 })();
